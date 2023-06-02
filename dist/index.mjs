@@ -1,4 +1,4 @@
-import { cwd, env } from 'node:process';
+import { cwd, env, exit } from 'node:process';
 import { readdirSync, lstatSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import require$$0$3 from 'tty';
 import require$$1$1 from 'util';
@@ -57573,19 +57573,18 @@ function buildFileMap (fileMap, context) {
 
     if (!fileMap[id] || !reg.test(id)) return true
 
-    const el = context.getModuleInfo(id);
+    const el = context.getModuleInfo(id).originModule;
 
     const isVue = id.endsWith('.vue');
 
     try {
-      const unusedImporter = isVue
-        ? findUnusedImportsInVue(el.originalCode)
-        : findUnusedImports(el.originalCode);
+      const unusedCodeMap = isVue
+        ? findUnusedCodeInVue(el.originalCode)
+        : findUnusedCode(el.originalCode);
 
-      if (unusedImporter.size)
-        fileMap[el.id].add(
-          `${Array.from(unusedImporter).join(' , ')} was imported/declared , but never use.`,
-        );
+        for (let key in unusedCodeMap) {
+          fileMap[el.id].add(unusedCodeMap[key]);
+        }
     } catch (err) {
       fileMap[el.id].add(`编译出错 message：${err.message}`);
     }
@@ -57605,8 +57604,8 @@ function buildFileMap (fileMap, context) {
   });
 }
 
-function findUnusedImports(originalCode, templateVars = new Set()) {
-  let unusedVars = new Set();
+function findUnusedCode(originalCode, templateVars = new Set()) {
+  const unusedVars = {};
 
   const astree = parse_1(originalCode, {
     sourceType: 'module',
@@ -57617,7 +57616,7 @@ function findUnusedImports(originalCode, templateVars = new Set()) {
     Program: function (path) {
       const binding = path.scope.getAllBindings();
       for (let key in binding) {
-        if (!binding[key].referenced && !templateVars.has(key)) unusedVars.add(key);
+        if (!binding[key].referenced && !templateVars.has(key)) unusedVars[key] = `${binding[key].kind} - ${originalCode.substring(binding[key].identifier.start, binding[key].identifier.end)}`;
       }
     },
   });
@@ -57625,7 +57624,7 @@ function findUnusedImports(originalCode, templateVars = new Set()) {
   return unusedVars
 }
 
-function findUnusedImportsInVue(originalCode) {
+function findUnusedCodeInVue(originalCode) {
   const ast = compilerDomExports.parse(originalCode);
 
   const script = ast.children.find(
@@ -57633,16 +57632,16 @@ function findUnusedImportsInVue(originalCode) {
       v.tag === 'script' && !v.props.some((p) => p.src) && v.children.length,
   );
 
-  if (!script) return new Set()
+  if (!script) return {}
 
   const templateVars = findTemplateVars(
     ast.children.find((v) => v.tag === 'template'),
   );
 
   if (script.props.some((v) => v.name === 'setup')) {
-    return findUnusedImports(script.children[0].content, templateVars)
+    return findUnusedCode(script.children[0].content, templateVars)
   } else {
-    return findUnusedVarsInVue(script.children[0].content, templateVars)
+    return findUnusedCodeInVueObject(script.children[0].content, templateVars)
   }
 }
 
@@ -57669,6 +57668,11 @@ function findTemplateVars(node) {
         usedVars.add(path?.node?.name || '');
       }
     },
+    ObjectProperty: function(path) {
+      if (path.node?.key?.name === 'callback' || path.node?.key?.name === 'callbackName') {
+        if (path.node?.value?.value) usedVars.add(path.node?.value?.value);
+      }
+    }
   });
 
   return usedVars
@@ -57678,8 +57682,8 @@ function upper(all, letter) {
   return letter.toUpperCase()
 }
 
-function findUnusedVarsInVue(originalCode, templateVars = new Set()) {
-  let unusedVars = new Set();
+function findUnusedCodeInVueObject(originalCode, templateVars = new Set()) {
+  const unusedVars = {};
 
   const astree = parse_1(originalCode, {
     sourceType: 'module',
@@ -57690,19 +57694,21 @@ function findUnusedVarsInVue(originalCode, templateVars = new Set()) {
     'props',
     'data',
     'setup',
-    'watch',
     'computed',
     'methods',
     'inject',
   ]);
-  const vueVars = new Set();
+  const vueVars = {};
+
+  const addValue = (key, node, val, parent) => {
+		if (!templateVars.has(val))	vueVars[val] = `${key} - ${originalCode.substring(parent?.start || node.start, parent?.end || node.end)}`;
+	};
 
   traverse(astree, {
     Program: function (path) {
       const binding = path.scope.getAllBindings();
       for (let key in binding) {
-        if (!binding[key].referenced && !templateVars.has(key))
-          unusedVars.add(key);
+        if (!binding[key].referenced && !templateVars.has(key)) unusedVars[key] = `${binding[key].kind} - ${originalCode.substring(binding[key].identifier.start, binding[key].identifier.end)}`;
       }
     },
     ObjectExpression: function (path) {
@@ -57712,9 +57718,7 @@ function findUnusedVarsInVue(originalCode, templateVars = new Set()) {
             if (n.type === 'ObjectProperty') {
               if (n.value.type === 'ArrayExpression') {
                 n.value.elements.forEach(
-                  (p) =>
-                    !templateVars.has(p?.value || '') &&
-                    vueVars.add(p?.value || ''),
+                  (p) => addValue(n?.key?.name, p, p.value)
                 );
               } else if (n.value.type === 'ObjectExpression') {
                 n.value.properties.forEach((p) => {
@@ -57727,30 +57731,25 @@ function findUnusedVarsInVue(originalCode, templateVars = new Set()) {
                         p.argument.arguments[p.argument.arguments.length - 1];
                       if (t.type === 'ArrayExpression') {
                         t.elements.forEach(
-                          (v) =>
-                            !templateVars.has(v?.value || '') &&
-                            vueVars.add(v?.value || ''),
+                          (v) => addValue(p?.argument?.callee?.name, v, v.value)
                         );
                       } else if (t.type === 'ObjectExpression') {
                         t.properties.forEach(
-                          (v) =>
-                            !templateVars.has(v?.key?.name || '') &&
-                            vueVars.add(v?.key?.name || ''),
+                          (v) => addValue(p?.argument?.callee?.name, v.key, v?.key?.name, v)
                         );
                       }
                     }
+                  } else if (p.key.type === 'StringLiteral') {
+										addValue(n?.key?.name, p.key, p?.key?.value, p);
                   } else {
-                    !templateVars.has(p?.key?.name || '') &&
-                      vueVars.add(p?.key?.name || '');
-                  }
+										addValue(n?.key?.name, p.key, p?.key?.name, p);
+									}
                 });
               } else if (n.value.type === 'FunctionExpression') {
                 n.value.body.body.forEach((b) => {
                   if (b.type === 'ReturnStatement')
                     b.argument.properties.forEach(
-                      (p) =>
-                        !templateVars.has(p?.key?.name) &&
-                        vueVars.add(p?.key?.name || ''),
+                      (p) => addValue(n?.key?.name, p.key, p?.key?.name, p)
                     );
                 });
               }
@@ -57758,9 +57757,7 @@ function findUnusedVarsInVue(originalCode, templateVars = new Set()) {
               n.body.body.forEach((b) => {
                 if (b.type === 'ReturnStatement')
                   b.argument.properties.forEach(
-                    (p) =>
-                      !templateVars.has(p?.key?.name) &&
-                      vueVars.add(p?.key?.name || ''),
+										(p) => addValue(n?.key?.name, p.key, p?.key?.name, p)
                   );
               });
             }
@@ -57771,18 +57768,57 @@ function findUnusedVarsInVue(originalCode, templateVars = new Set()) {
   });
 
   traverse(astree, {
+		VariableDeclarator: function (path) {
+			if (path?.node?.init?.type === 'ThisExpression') {
+				const name = path.node.id.name;
+				path.scope.traverse(path.scope.block, {
+					MemberExpression: function (blockPath) {
+						if (
+							vueVars[blockPath?.node?.property?.name] &&
+							blockPath?.node?.object?.name === name
+						)
+							delete vueVars[blockPath?.node?.property?.name];
+					}
+				});
+			}
+		},
+		AssignmentExpression: function (path) {
+			if (path?.node?.right?.type === 'ThisExpression') {
+				const name = path.node.left.name;
+				path.scope.traverse(path.scope.block, {
+					MemberExpression: function (blockPath) {
+						if (
+							vueVars[blockPath?.node?.property?.name] &&
+							blockPath?.node?.object?.name === name
+						)
+							delete vueVars[blockPath?.node?.property?.name];
+					}
+				});
+			}
+		},
     MemberExpression: function (path) {
       if (
-        vueVars.has(path?.node?.property?.name) &&
+        vueVars[path?.node?.property?.name] &&
         path?.node?.object?.type === 'ThisExpression'
       )
-        vueVars.delete(path?.node?.property?.name);
+        delete vueVars[path?.node?.property?.name];
     },
+    ObjectProperty: function(path) {
+      if (path?.parentPath?.parent?.type === 'ExportDefaultDeclaration' && path.node?.key?.name === 'watch') {
+        path.node.value.properties.forEach(v => {
+          if (vueVars[v?.key?.name]) delete vueVars[v?.key?.name];
+					if (vueVars[v?.key?.value]) delete vueVars[v?.key?.value];
+        });
+      } else if (path.node?.key?.name === 'callback' || path.node?.key?.name === 'callbackName') {
+				if (vueVars[path.node?.value?.value]) delete vueVars[path.node?.value?.value];
+      }
+    }
   });
 
-  vueVars.forEach((v) => v.trim() && unusedVars.add(v));
-
-  return unusedVars
+  return {
+		...unusedVars,
+		...vueVars
+	}
 }
 
 function writeFileMap(fileMap, outDir) {
@@ -57795,10 +57831,7 @@ function writeFileMap(fileMap, outDir) {
     } else if (fileMap[key].size) {
       uselessCodeContent += `${key}\n`;
 
-      let count = 0;
-      fileMap[key].forEach(
-        (str) => (uselessCodeContent +=  (`${fileMap[key].size > 1 ? ++count + '. ' : ''}`+ `${str}\n`)),
-      );
+      fileMap[key].forEach((str) => uselessCodeContent += `${str}\n`);
 
       uselessCodeContent += '\n\n';
     }
@@ -57814,6 +57847,7 @@ function writeContent(fileName, content, outDir) {
   if (!existsSync(base + path)) autoMkdir(base, path);
 
   writeFileSync(base + path + fileName, content);
+  console.log(`${base + path + fileName} write complete!`);
 }
 
 function autoMkdir(base, path) {
@@ -57834,7 +57868,7 @@ function writeRollupSourceCode() {
 
   const data = readFileSync(path, 'utf8');
 
-  writeFileSync(path, data.replace('return foundModule.info;', 'return foundModule;'));
+  writeFileSync(path, data.replace('return foundModule.info;', 'return { originModule: foundModule, ...foundModule.info };'));
 }
 
 const DEADCODE = env.DEAD_CODE === 'true';
@@ -57865,19 +57899,7 @@ function deadcodePlugins(customOptions = {}) {
     async buildEnd() {
       buildFileMap(fileMap, this);
       writeFileMap(fileMap, options.outDir);
-      if (options.breakBuild) {
-        console.log('deadcode write complete!');
-        console.log('deadcode write complete!');
-        console.log('deadcode write complete!');
-        console.log('deadcode write complete!');
-        console.log('deadcode write complete!');
-        console.log('deadcode write complete!');
-        console.log('deadcode write complete!');
-        console.log('deadcode write complete!');
-        console.log('deadcode write complete!');
-        console.log('deadcode write complete!');
-        this.error('deadcode write complete!');
-      }
+      if (options.breakBuild) exit(0);
     }
   }
 }

@@ -16,10 +16,7 @@ export function writeFileMap(fileMap, outDir) {
     } else if (fileMap[key].size) {
       uselessCodeContent += `${key}\n`
 
-      let count = 0
-      fileMap[key].forEach(
-        (str) => (uselessCodeContent +=  (`${fileMap[key].size > 1 ? ++count + '. ' : ''}`+ `${str}\n`)),
-      )
+      fileMap[key].forEach((str) => uselessCodeContent += `${str}\n`)
 
       uselessCodeContent += '\n\n'
     }
@@ -35,6 +32,7 @@ export function writeContent(fileName, content, outDir) {
   if (!existsSync(base + path)) autoMkdir(base, path)
 
   writeFileSync(base + path + fileName, content)
+  console.log(`${base + path + fileName} write complete!`)
 }
 
 export function autoMkdir(base, path) {
@@ -55,5 +53,5 @@ export function writeRollupSourceCode() {
 
   const data = readFileSync(path, 'utf8');
 
-  writeFileSync(path, data.replace('return foundModule.info;', 'return foundModule;'))
+  writeFileSync(path, data.replace('return foundModule.info;', 'return { originModule: foundModule, ...foundModule.info };'))
 }

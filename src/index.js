@@ -1,4 +1,4 @@
-import { env } from 'node:process'
+import { env, exit } from 'node:process'
 import { createFileMap } from './create'
 import { buildFileMap } from './build'
 import { writeRollupSourceCode, writeFileMap } from './write'
@@ -31,19 +31,7 @@ function deadcodePlugins(customOptions = {}) {
     async buildEnd() {
       buildFileMap(fileMap, this)
       writeFileMap(fileMap, options.outDir)
-      if (options.breakBuild) {
-        console.log('deadcode write complete!')
-        console.log('deadcode write complete!')
-        console.log('deadcode write complete!')
-        console.log('deadcode write complete!')
-        console.log('deadcode write complete!')
-        console.log('deadcode write complete!')
-        console.log('deadcode write complete!')
-        console.log('deadcode write complete!')
-        console.log('deadcode write complete!')
-        console.log('deadcode write complete!')
-        this.error('deadcode write complete!')
-      }
+      if (options.breakBuild) exit(0)
     }
   }
 }
