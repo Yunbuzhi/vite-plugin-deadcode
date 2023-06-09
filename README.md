@@ -19,9 +19,8 @@ import deadcodePlugins from 'vite-plugin-deadcode'
 
 export default defineConfig({
   plugins: [deadcodePlugins({
-    inputDir: 'src',
-    outDir: 'dist',
-    breakBuild: true,
+    inputDir: 'src',  // 检查目录
+    outDir: 'dist'  // deadcode输出目录
   })]
 })
 ```

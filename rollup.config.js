@@ -1,6 +1,8 @@
 import resolve from '@rollup/plugin-node-resolve';
 import json from '@rollup/plugin-json';
 import commonjs from '@rollup/plugin-commonjs';
+import terser from '@rollup/plugin-terser';
+
 
 export default {
   input: "./src/index.js", // 入口文件
@@ -17,6 +19,7 @@ export default {
   plugins: [
     resolve(),
     json(),
-    commonjs()
+    commonjs(),
+    terser()
   ]
 };
