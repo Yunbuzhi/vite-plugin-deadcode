@@ -1,5 +1,5 @@
 import { cwd, env, exit } from 'node:process';
-import { readdirSync, lstatSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readdirSync, lstatSync, readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import require$$0$3 from 'tty';
 import require$$1$1 from 'util';
 import require$$0$2 from 'os';
@@ -3319,296 +3319,306 @@ function isValidIdentifier(name, reserved = true) {
 
 var lib$9 = {};
 
-Object.defineProperty(lib$9, "__esModule", {
-  value: true
-});
-lib$9.readCodePoint = readCodePoint$1;
-lib$9.readInt = readInt$1;
-lib$9.readStringContents = readStringContents$1;
-var _isDigit$1 = function isDigit(code) {
-  return code >= 48 && code <= 57;
-};
-const forbiddenNumericSeparatorSiblings$1 = {
-  decBinOct: new Set([46, 66, 69, 79, 95, 98, 101, 111]),
-  hex: new Set([46, 88, 95, 120])
-};
-const isAllowedNumericSeparatorSibling$1 = {
-  bin: ch => ch === 48 || ch === 49,
-  oct: ch => ch >= 48 && ch <= 55,
-  dec: ch => ch >= 48 && ch <= 57,
-  hex: ch => ch >= 48 && ch <= 57 || ch >= 65 && ch <= 70 || ch >= 97 && ch <= 102
-};
-function readStringContents$1(type, input, pos, lineStart, curLine, errors) {
-  const initialPos = pos;
-  const initialLineStart = lineStart;
-  const initialCurLine = curLine;
-  let out = "";
-  let firstInvalidLoc = null;
-  let chunkStart = pos;
-  const {
-    length
-  } = input;
-  for (;;) {
-    if (pos >= length) {
-      errors.unterminated(initialPos, initialLineStart, initialCurLine);
-      out += input.slice(chunkStart, pos);
-      break;
-    }
-    const ch = input.charCodeAt(pos);
-    if (isStringEnd$1(type, ch, input, pos)) {
-      out += input.slice(chunkStart, pos);
-      break;
-    }
-    if (ch === 92) {
-      out += input.slice(chunkStart, pos);
-      const res = readEscapedChar$1(input, pos, lineStart, curLine, type === "template", errors);
-      if (res.ch === null && !firstInvalidLoc) {
-        firstInvalidLoc = {
-          pos,
-          lineStart,
-          curLine
-        };
-      } else {
-        out += res.ch;
-      }
-      ({
-        pos,
-        lineStart,
-        curLine
-      } = res);
-      chunkStart = pos;
-    } else if (ch === 8232 || ch === 8233) {
-      ++pos;
-      ++curLine;
-      lineStart = pos;
-    } else if (ch === 10 || ch === 13) {
-      if (type === "template") {
-        out += input.slice(chunkStart, pos) + "\n";
-        ++pos;
-        if (ch === 13 && input.charCodeAt(pos) === 10) {
-          ++pos;
-        }
-        ++curLine;
-        chunkStart = lineStart = pos;
-      } else {
-        errors.unterminated(initialPos, initialLineStart, initialCurLine);
-      }
-    } else {
-      ++pos;
-    }
-  }
-  return {
-    pos,
-    str: out,
-    firstInvalidLoc,
-    lineStart,
-    curLine,
-    containsInvalid: !!firstInvalidLoc
-  };
-}
-function isStringEnd$1(type, ch, input, pos) {
-  if (type === "template") {
-    return ch === 96 || ch === 36 && input.charCodeAt(pos + 1) === 123;
-  }
-  return ch === (type === "double" ? 34 : 39);
-}
-function readEscapedChar$1(input, pos, lineStart, curLine, inTemplate, errors) {
-  const throwOnInvalid = !inTemplate;
-  pos++;
-  const res = ch => ({
-    pos,
-    ch,
-    lineStart,
-    curLine
-  });
-  const ch = input.charCodeAt(pos++);
-  switch (ch) {
-    case 110:
-      return res("\n");
-    case 114:
-      return res("\r");
-    case 120:
-      {
-        let code;
-        ({
-          code,
-          pos
-        } = readHexChar$1(input, pos, lineStart, curLine, 2, false, throwOnInvalid, errors));
-        return res(code === null ? null : String.fromCharCode(code));
-      }
-    case 117:
-      {
-        let code;
-        ({
-          code,
-          pos
-        } = readCodePoint$1(input, pos, lineStart, curLine, throwOnInvalid, errors));
-        return res(code === null ? null : String.fromCodePoint(code));
-      }
-    case 116:
-      return res("\t");
-    case 98:
-      return res("\b");
-    case 118:
-      return res("\u000b");
-    case 102:
-      return res("\f");
-    case 13:
-      if (input.charCodeAt(pos) === 10) {
-        ++pos;
-      }
-    case 10:
-      lineStart = pos;
-      ++curLine;
-    case 8232:
-    case 8233:
-      return res("");
-    case 56:
-    case 57:
-      if (inTemplate) {
-        return res(null);
-      } else {
-        errors.strictNumericEscape(pos - 1, lineStart, curLine);
-      }
-    default:
-      if (ch >= 48 && ch <= 55) {
-        const startPos = pos - 1;
-        const match = input.slice(startPos, pos + 2).match(/^[0-7]+/);
-        let octalStr = match[0];
-        let octal = parseInt(octalStr, 8);
-        if (octal > 255) {
-          octalStr = octalStr.slice(0, -1);
-          octal = parseInt(octalStr, 8);
-        }
-        pos += octalStr.length - 1;
-        const next = input.charCodeAt(pos);
-        if (octalStr !== "0" || next === 56 || next === 57) {
-          if (inTemplate) {
-            return res(null);
-          } else {
-            errors.strictNumericEscape(startPos, lineStart, curLine);
-          }
-        }
-        return res(String.fromCharCode(octal));
-      }
-      return res(String.fromCharCode(ch));
-  }
-}
-function readHexChar$1(input, pos, lineStart, curLine, len, forceLen, throwOnInvalid, errors) {
-  const initialPos = pos;
-  let n;
-  ({
-    n,
-    pos
-  } = readInt$1(input, pos, lineStart, curLine, 16, len, forceLen, false, errors, !throwOnInvalid));
-  if (n === null) {
-    if (throwOnInvalid) {
-      errors.invalidEscapeSequence(initialPos, lineStart, curLine);
-    } else {
-      pos = initialPos - 1;
-    }
-  }
-  return {
-    code: n,
-    pos
-  };
-}
-function readInt$1(input, pos, lineStart, curLine, radix, len, forceLen, allowNumSeparator, errors, bailOnError) {
-  const start = pos;
-  const forbiddenSiblings = radix === 16 ? forbiddenNumericSeparatorSiblings$1.hex : forbiddenNumericSeparatorSiblings$1.decBinOct;
-  const isAllowedSibling = radix === 16 ? isAllowedNumericSeparatorSibling$1.hex : radix === 10 ? isAllowedNumericSeparatorSibling$1.dec : radix === 8 ? isAllowedNumericSeparatorSibling$1.oct : isAllowedNumericSeparatorSibling$1.bin;
-  let invalid = false;
-  let total = 0;
-  for (let i = 0, e = len == null ? Infinity : len; i < e; ++i) {
-    const code = input.charCodeAt(pos);
-    let val;
-    if (code === 95 && allowNumSeparator !== "bail") {
-      const prev = input.charCodeAt(pos - 1);
-      const next = input.charCodeAt(pos + 1);
-      if (!allowNumSeparator) {
-        if (bailOnError) return {
-          n: null,
-          pos
-        };
-        errors.numericSeparatorInEscapeSequence(pos, lineStart, curLine);
-      } else if (Number.isNaN(next) || !isAllowedSibling(next) || forbiddenSiblings.has(prev) || forbiddenSiblings.has(next)) {
-        if (bailOnError) return {
-          n: null,
-          pos
-        };
-        errors.unexpectedNumericSeparator(pos, lineStart, curLine);
-      }
-      ++pos;
-      continue;
-    }
-    if (code >= 97) {
-      val = code - 97 + 10;
-    } else if (code >= 65) {
-      val = code - 65 + 10;
-    } else if (_isDigit$1(code)) {
-      val = code - 48;
-    } else {
-      val = Infinity;
-    }
-    if (val >= radix) {
-      if (val <= 9 && bailOnError) {
-        return {
-          n: null,
-          pos
-        };
-      } else if (val <= 9 && errors.invalidDigit(pos, lineStart, curLine, radix)) {
-        val = 0;
-      } else if (forceLen) {
-        val = 0;
-        invalid = true;
-      } else {
-        break;
-      }
-    }
-    ++pos;
-    total = total * radix + val;
-  }
-  if (pos === start || len != null && pos - start !== len || invalid) {
-    return {
-      n: null,
-      pos
-    };
-  }
-  return {
-    n: total,
-    pos
-  };
-}
-function readCodePoint$1(input, pos, lineStart, curLine, throwOnInvalid, errors) {
-  const ch = input.charCodeAt(pos);
-  let code;
-  if (ch === 123) {
-    ++pos;
-    ({
-      code,
-      pos
-    } = readHexChar$1(input, pos, lineStart, curLine, input.indexOf("}", pos) - pos, true, throwOnInvalid, errors));
-    ++pos;
-    if (code !== null && code > 0x10ffff) {
-      if (throwOnInvalid) {
-        errors.invalidCodePoint(pos, lineStart, curLine);
-      } else {
-        return {
-          code: null,
-          pos
-        };
-      }
-    }
-  } else {
-    ({
-      code,
-      pos
-    } = readHexChar$1(input, pos, lineStart, curLine, 4, false, throwOnInvalid, errors));
-  }
-  return {
-    code,
-    pos
-  };
+var hasRequiredLib$2;
+
+function requireLib$2 () {
+	if (hasRequiredLib$2) return lib$9;
+	hasRequiredLib$2 = 1;
+
+	Object.defineProperty(lib$9, "__esModule", {
+	  value: true
+	});
+	lib$9.readCodePoint = readCodePoint;
+	lib$9.readInt = readInt;
+	lib$9.readStringContents = readStringContents;
+	var _isDigit = function isDigit(code) {
+	  return code >= 48 && code <= 57;
+	};
+	const forbiddenNumericSeparatorSiblings = {
+	  decBinOct: new Set([46, 66, 69, 79, 95, 98, 101, 111]),
+	  hex: new Set([46, 88, 95, 120])
+	};
+	const isAllowedNumericSeparatorSibling = {
+	  bin: ch => ch === 48 || ch === 49,
+	  oct: ch => ch >= 48 && ch <= 55,
+	  dec: ch => ch >= 48 && ch <= 57,
+	  hex: ch => ch >= 48 && ch <= 57 || ch >= 65 && ch <= 70 || ch >= 97 && ch <= 102
+	};
+	function readStringContents(type, input, pos, lineStart, curLine, errors) {
+	  const initialPos = pos;
+	  const initialLineStart = lineStart;
+	  const initialCurLine = curLine;
+	  let out = "";
+	  let firstInvalidLoc = null;
+	  let chunkStart = pos;
+	  const {
+	    length
+	  } = input;
+	  for (;;) {
+	    if (pos >= length) {
+	      errors.unterminated(initialPos, initialLineStart, initialCurLine);
+	      out += input.slice(chunkStart, pos);
+	      break;
+	    }
+	    const ch = input.charCodeAt(pos);
+	    if (isStringEnd(type, ch, input, pos)) {
+	      out += input.slice(chunkStart, pos);
+	      break;
+	    }
+	    if (ch === 92) {
+	      out += input.slice(chunkStart, pos);
+	      const res = readEscapedChar(input, pos, lineStart, curLine, type === "template", errors);
+	      if (res.ch === null && !firstInvalidLoc) {
+	        firstInvalidLoc = {
+	          pos,
+	          lineStart,
+	          curLine
+	        };
+	      } else {
+	        out += res.ch;
+	      }
+	      ({
+	        pos,
+	        lineStart,
+	        curLine
+	      } = res);
+	      chunkStart = pos;
+	    } else if (ch === 8232 || ch === 8233) {
+	      ++pos;
+	      ++curLine;
+	      lineStart = pos;
+	    } else if (ch === 10 || ch === 13) {
+	      if (type === "template") {
+	        out += input.slice(chunkStart, pos) + "\n";
+	        ++pos;
+	        if (ch === 13 && input.charCodeAt(pos) === 10) {
+	          ++pos;
+	        }
+	        ++curLine;
+	        chunkStart = lineStart = pos;
+	      } else {
+	        errors.unterminated(initialPos, initialLineStart, initialCurLine);
+	      }
+	    } else {
+	      ++pos;
+	    }
+	  }
+	  return {
+	    pos,
+	    str: out,
+	    firstInvalidLoc,
+	    lineStart,
+	    curLine,
+	    containsInvalid: !!firstInvalidLoc
+	  };
+	}
+	function isStringEnd(type, ch, input, pos) {
+	  if (type === "template") {
+	    return ch === 96 || ch === 36 && input.charCodeAt(pos + 1) === 123;
+	  }
+	  return ch === (type === "double" ? 34 : 39);
+	}
+	function readEscapedChar(input, pos, lineStart, curLine, inTemplate, errors) {
+	  const throwOnInvalid = !inTemplate;
+	  pos++;
+	  const res = ch => ({
+	    pos,
+	    ch,
+	    lineStart,
+	    curLine
+	  });
+	  const ch = input.charCodeAt(pos++);
+	  switch (ch) {
+	    case 110:
+	      return res("\n");
+	    case 114:
+	      return res("\r");
+	    case 120:
+	      {
+	        let code;
+	        ({
+	          code,
+	          pos
+	        } = readHexChar(input, pos, lineStart, curLine, 2, false, throwOnInvalid, errors));
+	        return res(code === null ? null : String.fromCharCode(code));
+	      }
+	    case 117:
+	      {
+	        let code;
+	        ({
+	          code,
+	          pos
+	        } = readCodePoint(input, pos, lineStart, curLine, throwOnInvalid, errors));
+	        return res(code === null ? null : String.fromCodePoint(code));
+	      }
+	    case 116:
+	      return res("\t");
+	    case 98:
+	      return res("\b");
+	    case 118:
+	      return res("\u000b");
+	    case 102:
+	      return res("\f");
+	    case 13:
+	      if (input.charCodeAt(pos) === 10) {
+	        ++pos;
+	      }
+	    case 10:
+	      lineStart = pos;
+	      ++curLine;
+	    case 8232:
+	    case 8233:
+	      return res("");
+	    case 56:
+	    case 57:
+	      if (inTemplate) {
+	        return res(null);
+	      } else {
+	        errors.strictNumericEscape(pos - 1, lineStart, curLine);
+	      }
+	    default:
+	      if (ch >= 48 && ch <= 55) {
+	        const startPos = pos - 1;
+	        const match = input.slice(startPos, pos + 2).match(/^[0-7]+/);
+	        let octalStr = match[0];
+	        let octal = parseInt(octalStr, 8);
+	        if (octal > 255) {
+	          octalStr = octalStr.slice(0, -1);
+	          octal = parseInt(octalStr, 8);
+	        }
+	        pos += octalStr.length - 1;
+	        const next = input.charCodeAt(pos);
+	        if (octalStr !== "0" || next === 56 || next === 57) {
+	          if (inTemplate) {
+	            return res(null);
+	          } else {
+	            errors.strictNumericEscape(startPos, lineStart, curLine);
+	          }
+	        }
+	        return res(String.fromCharCode(octal));
+	      }
+	      return res(String.fromCharCode(ch));
+	  }
+	}
+	function readHexChar(input, pos, lineStart, curLine, len, forceLen, throwOnInvalid, errors) {
+	  const initialPos = pos;
+	  let n;
+	  ({
+	    n,
+	    pos
+	  } = readInt(input, pos, lineStart, curLine, 16, len, forceLen, false, errors, !throwOnInvalid));
+	  if (n === null) {
+	    if (throwOnInvalid) {
+	      errors.invalidEscapeSequence(initialPos, lineStart, curLine);
+	    } else {
+	      pos = initialPos - 1;
+	    }
+	  }
+	  return {
+	    code: n,
+	    pos
+	  };
+	}
+	function readInt(input, pos, lineStart, curLine, radix, len, forceLen, allowNumSeparator, errors, bailOnError) {
+	  const start = pos;
+	  const forbiddenSiblings = radix === 16 ? forbiddenNumericSeparatorSiblings.hex : forbiddenNumericSeparatorSiblings.decBinOct;
+	  const isAllowedSibling = radix === 16 ? isAllowedNumericSeparatorSibling.hex : radix === 10 ? isAllowedNumericSeparatorSibling.dec : radix === 8 ? isAllowedNumericSeparatorSibling.oct : isAllowedNumericSeparatorSibling.bin;
+	  let invalid = false;
+	  let total = 0;
+	  for (let i = 0, e = len == null ? Infinity : len; i < e; ++i) {
+	    const code = input.charCodeAt(pos);
+	    let val;
+	    if (code === 95 && allowNumSeparator !== "bail") {
+	      const prev = input.charCodeAt(pos - 1);
+	      const next = input.charCodeAt(pos + 1);
+	      if (!allowNumSeparator) {
+	        if (bailOnError) return {
+	          n: null,
+	          pos
+	        };
+	        errors.numericSeparatorInEscapeSequence(pos, lineStart, curLine);
+	      } else if (Number.isNaN(next) || !isAllowedSibling(next) || forbiddenSiblings.has(prev) || forbiddenSiblings.has(next)) {
+	        if (bailOnError) return {
+	          n: null,
+	          pos
+	        };
+	        errors.unexpectedNumericSeparator(pos, lineStart, curLine);
+	      }
+	      ++pos;
+	      continue;
+	    }
+	    if (code >= 97) {
+	      val = code - 97 + 10;
+	    } else if (code >= 65) {
+	      val = code - 65 + 10;
+	    } else if (_isDigit(code)) {
+	      val = code - 48;
+	    } else {
+	      val = Infinity;
+	    }
+	    if (val >= radix) {
+	      if (val <= 9 && bailOnError) {
+	        return {
+	          n: null,
+	          pos
+	        };
+	      } else if (val <= 9 && errors.invalidDigit(pos, lineStart, curLine, radix)) {
+	        val = 0;
+	      } else if (forceLen) {
+	        val = 0;
+	        invalid = true;
+	      } else {
+	        break;
+	      }
+	    }
+	    ++pos;
+	    total = total * radix + val;
+	  }
+	  if (pos === start || len != null && pos - start !== len || invalid) {
+	    return {
+	      n: null,
+	      pos
+	    };
+	  }
+	  return {
+	    n: total,
+	    pos
+	  };
+	}
+	function readCodePoint(input, pos, lineStart, curLine, throwOnInvalid, errors) {
+	  const ch = input.charCodeAt(pos);
+	  let code;
+	  if (ch === 123) {
+	    ++pos;
+	    ({
+	      code,
+	      pos
+	    } = readHexChar(input, pos, lineStart, curLine, input.indexOf("}", pos) - pos, true, throwOnInvalid, errors));
+	    ++pos;
+	    if (code !== null && code > 0x10ffff) {
+	      if (throwOnInvalid) {
+	        errors.invalidCodePoint(pos, lineStart, curLine);
+	      } else {
+	        return {
+	          code: null,
+	          pos
+	        };
+	      }
+	    }
+	  } else {
+	    ({
+	      code,
+	      pos
+	    } = readHexChar(input, pos, lineStart, curLine, 4, false, throwOnInvalid, errors));
+	  }
+	  return {
+	    code,
+	    pos
+	  };
+	}
+
+	
+	return lib$9;
 }
 
 var constants = {};
@@ -3963,7 +3973,7 @@ function requireCore () {
 	var _is = requireIs();
 	var _isValidIdentifier = isValidIdentifier$1;
 	var _helperValidatorIdentifier = lib$a;
-	var _helperStringParser = lib$9;
+	var _helperStringParser = requireLib$2();
 	var _constants = constants;
 	var _utils = requireUtils();
 	const defineType = (0, _utils.defineAliasedType)("Standardized");
@@ -57567,45 +57577,65 @@ if (process.env.NODE_ENV === 'production') {
 
 var compilerDomExports = compilerDom.exports;
 
-function buildFileMap (fileMap, context) {
-  const reg = new RegExp(/\.js$|\.ts$|\.vue/);
-  Object.keys(fileMap).forEach((id) => {
+const reg = new RegExp(/\.js$|\.ts$|\.vue/);
+let resolveDep = null;
+let hasFile = null;
+let checkFile = null;
+let fileQueue = [];
 
-    if (!fileMap[id] || !reg.test(id)) return true
 
-    const el = context.getModuleInfo(id).originModule;
-
-    const isVue = id.endsWith('.vue');
-
-    try {
-      const unusedCodeMap = isVue
-        ? findUnusedCodeInVue(el.originalCode)
-        : findUnusedCode(el.originalCode);
-
-        for (let key in unusedCodeMap) {
-          fileMap[el.id].add(unusedCodeMap[key]);
-        }
-    } catch (err) {
-      fileMap[el.id].add(`编译出错 message：${err.message}`);
-    }
-
-    if (!isVue) {
-      el.ast.body.forEach((m) => {
-        if (!m.included && !m.type.includes('Import')) {
-          let content = `${m.context.code.substring(m.start, m.end)}`;
-          if (
-            !content.includes('/* @__PURE__ */') &&
-            !new RegExp(/.*export.*from.*/).test(content)
-          )
-            fileMap[el.id].add(content);
-        }
-      });
-    }
-  });
+async function flushFileQueue (context, fileObj, fileMap) {
+  let id = null;
+  let temp = null;
+  while (fileQueue.length) {
+    id = fileQueue.pop();
+    fileMap[id] = new Set();
+    temp = await generateFileObj(id, context, fileMap);
+    if (temp) fileObj[id] = temp;
+  }
 }
 
-function findUnusedCode(originalCode, templateVars = new Set()) {
-  const unusedVars = {};
+
+async function generateFileObj (moduleId, context, fileMap) {
+
+  if (!hasFile) hasFile = (id) => id && fileMap.hasOwnProperty(id);
+
+  if (!checkFile) checkFile = (id) => fileMap[id];
+
+  if (!reg.test(moduleId)) return null
+
+  resolveDep = async (url) => {
+    return await context.resolve(url, moduleId)
+  };
+
+  let result = {
+    importMaps: {},
+    exportNames: new Set(),
+    unusedCodeMap: {},
+    errMessage: ''
+  };
+
+  try {
+    result = {
+      ...result,
+      ...(moduleId.endsWith('.vue') ? await findUnusedCodeInVue(readFileSync(moduleId, 'utf-8')) : await findUnusedCode(readFileSync(moduleId, 'utf-8'), new Set())),
+    };
+  } catch (err) {
+    result.errMessage = `编译出错 message：${err.message}`;
+  }
+
+  return result
+}
+
+
+
+
+async function findUnusedCode(originalCode, templateVars = new Set()) {
+  const unusedCodeMap = {};
+  const importMaps = {};
+  const exportNames = new Set();
+
+  const asyncQueue = [];
 
   const astree = parse_1(originalCode, {
     sourceType: 'module',
@@ -57616,15 +57646,89 @@ function findUnusedCode(originalCode, templateVars = new Set()) {
     Program: function (path) {
       const binding = path.scope.getAllBindings();
       for (let key in binding) {
-        if (!binding[key].referenced && !templateVars.has(key)) unusedVars[key] = `${binding[key].kind} - ${originalCode.substring(binding[key].identifier.start, binding[key].identifier.end)}`;
+        if (!binding[key].referenced && !templateVars.has(key)) unusedCodeMap[key] = `${binding[key].kind} - ${originalCode.substring(binding[key].identifier.start, binding[key].identifier.end)}`;
       }
     },
+  
+    ExportNamedDeclaration(path) {
+      if (templateVars.size) return
+      if (path.node.declaration?.type === "VariableDeclaration") {
+        path.node.declaration.declarations.forEach((declaration) => {
+          exportNames.add(declaration.id.name);
+        });
+      } else if (path.node.declaration?.type === "FunctionDeclaration") {
+        exportNames.add(path.node.declaration.id.name);
+      }
+    },
+    ExportSpecifier(path) {
+      if (templateVars.size) return
+      exportNames.add(path.node.exported.name);
+    },
+    ExportDefaultDeclaration() {
+      if (templateVars.size) return
+      exportNames.add('default');
+    },
+
+    ImportDeclaration: function(path) {
+      asyncQueue.push(resolveDep(path.node.source.value).then(({id}) => {
+        if (!hasFile(id)) return
+        if (!checkFile(id) && !fileQueue.includes(id)) fileQueue.push(id);
+        if (id.endsWith('.vue')) return
+        if (!importMaps[id]) importMaps[id] = [];
+        importMaps[id].push(...path.node.specifiers.map(v => {
+          return {
+            importName: v?.imported?.name || 'default',
+            localName: v.local.name
+          }
+        }));
+      }));
+      
+    },
+    VariableDeclarator: function(path) {
+      if (path?.node?.init?.callee?.type === 'Import') {
+        asyncQueue.push(resolveDep(path?.node?.init?.callee?.arguments[0]?.value).then(({id}) => {
+          if (!hasFile(id)) return
+          if (!checkFile(id) && !fileQueue.includes(id)) fileQueue.push(id);
+          if (id.endsWith('.vue')) return
+          if (!importMaps[id]) importMaps[id] = [];
+          importMaps[id].push({
+            importName: 'default',
+            localName: path.node.id.name
+          });
+        }));
+      }
+    },
+    AssignmentExpression: function(path) {
+      if (path?.node?.right?.callee?.type === 'Import') {
+        asyncQueue.push(resolveDep(path?.node?.right?.callee?.arguments[0]?.value).then(({id}) => {
+          if (!hasFile(id)) return
+          if (!checkFile(id) && !fileQueue.includes(id)) fileQueue.push(id);
+          if (id.endsWith('.vue')) return
+          if (!importMaps[id]) importMaps[id] = [];
+          importMaps[id].push({
+            importName: 'default',
+            localName: path.node.left.name
+          });
+        }));
+      }
+    }
   });
 
-  return unusedVars
+  await Promise.all(asyncQueue);
+
+  Object.keys(importMaps).forEach(key => {
+    importMaps[key] = importMaps[key].filter(v => !unusedCodeMap[v.localName]);
+    if (!importMaps[key].length) delete importMaps[key];
+  });
+
+  return {
+    exportNames,
+    importMaps,
+    unusedCodeMap
+  }
 }
 
-function findUnusedCodeInVue(originalCode) {
+async function findUnusedCodeInVue(originalCode) {
   const ast = compilerDomExports.parse(originalCode);
 
   const script = ast.children.find(
@@ -57639,9 +57743,9 @@ function findUnusedCodeInVue(originalCode) {
   );
 
   if (script.props.some((v) => v.name === 'setup')) {
-    return findUnusedCode(script.children[0].content, templateVars)
+    return await findUnusedCode(script.children[0].content, templateVars)
   } else {
-    return findUnusedCodeInVueObject(script.children[0].content, templateVars)
+    return await findUnusedCodeInVueObject(script.children[0].content, templateVars)
   }
 }
 
@@ -57682,8 +57786,10 @@ function upper(all, letter) {
   return letter.toUpperCase()
 }
 
-function findUnusedCodeInVueObject(originalCode, templateVars = new Set()) {
+async function findUnusedCodeInVueObject(originalCode, templateVars = new Set()) {
+  const importMaps = {};
   const unusedVars = {};
+  const asyncQueue = [];
 
   const astree = parse_1(originalCode, {
     sourceType: 'module',
@@ -57708,7 +57814,7 @@ function findUnusedCodeInVueObject(originalCode, templateVars = new Set()) {
     Program: function (path) {
       const binding = path.scope.getAllBindings();
       for (let key in binding) {
-        if (!binding[key].referenced && !templateVars.has(key)) unusedVars[key] = `${binding[key].kind} - ${originalCode.substring(binding[key].identifier.start, binding[key].identifier.end)}`;
+        if (!binding[key].referenced) unusedVars[key] = `${binding[key].kind} - ${originalCode.substring(binding[key].identifier.start, binding[key].identifier.end)}`;
       }
     },
     ObjectExpression: function (path) {
@@ -57765,6 +57871,50 @@ function findUnusedCodeInVueObject(originalCode, templateVars = new Set()) {
         });
       }
     },
+
+
+		AssignmentExpression: function(path) {
+      if (path?.node?.right?.callee?.type === 'Import') {
+        asyncQueue.push(resolveDep(path?.node?.right?.callee?.arguments[0]?.value).then(({id}) => {
+          if (!hasFile(id)) return
+          if (!checkFile(id) && !fileQueue.includes(id)) fileQueue.push(id);
+          if (id.endsWith('.vue')) return
+          if (!importMaps[id]) importMaps[id] = [];
+          importMaps[id].push({
+            importName: 'default',
+            localName: path.node.left.name
+          });
+        }));
+      }
+		},
+		VariableDeclarator: function(path) {
+      if (path?.node?.init?.callee?.type === 'Import') {
+        asyncQueue.push(resolveDep(path?.node?.init?.callee?.arguments[0]?.value).then(({id}) => {
+          if (!hasFile(id)) return
+          if (!checkFile(id) && !fileQueue.includes(id)) fileQueue.push(id);
+          if (id.endsWith('.vue')) return
+          if (!importMaps[id]) importMaps[id] = [];
+          importMaps[id].push({
+            importName: 'default',
+            localName: path.node.id.name
+          });
+        }));
+      }
+		},
+    ImportDeclaration: function(path) {
+      asyncQueue.push(resolveDep(path.node.source.value).then(({id}) => {
+        if (!hasFile(id)) return
+        if (!checkFile(id) && !fileQueue.includes(id)) fileQueue.push(id);
+        if (id.endsWith('.vue')) return
+        if (!importMaps[id]) importMaps[id] = [];
+        importMaps[id].push(...path.node.specifiers.map(v => {
+          return {
+            importName: v?.imported?.name || 'default',
+            localName: v.local.name
+          }
+        }));
+      }));
+    }
   });
 
   traverse(astree, {
@@ -57815,10 +57965,43 @@ function findUnusedCodeInVueObject(originalCode, templateVars = new Set()) {
     }
   });
 
+  await Promise.all(asyncQueue);
+
+  Object.keys(importMaps).forEach(key => {
+    importMaps[key] = importMaps[key].filter(v => !unusedVars[v.localName] && !vueVars[v.localName]);
+    if (!importMaps[key].length) delete importMaps[key];
+  });
+
   return {
-		...unusedVars,
-		...vueVars
-	}
+    exportNames: new Set(),
+    importMaps,
+    unusedCodeMap: {
+      ...unusedVars,
+      ...vueVars
+    }
+  }
+}
+
+function buildFileMap (fileMap, fileObj) {
+  Object.keys(fileObj).forEach((id) => {
+    const importMaps = fileObj[id].importMaps;
+    for (const key in importMaps) {
+      importMaps[key].forEach(v => {
+        fileObj[key].exportNames.delete(v.importName);
+      });
+    }
+  });
+
+
+  Object.keys(fileObj).forEach((id) => {
+    for (let key in fileObj[id].unusedCodeMap) {
+      fileMap[id].add(fileObj[id].unusedCodeMap[key]);
+    }
+
+    fileObj[id].exportNames.forEach(v => fileMap[id].add(`export - ${v}\n`));
+
+    if (fileObj[id].errMessage) fileMap[id].add(fileObj[id].errMessage);
+  });
 }
 
 function writeFileMap(fileMap, outDir) {
@@ -57859,25 +58042,9 @@ function autoMkdir(base, path) {
   }
 }
 
-
-function writeRollupSourceCode() {
-
-  const path = `${cwd()}/node_modules/rollup/dist/shared/rollup.js`;
-
-  if (!existsSync(path)) throw new Error(`File "${path}" is not found`)
-
-  const data = readFileSync(path, 'utf8');
-
-  writeFileSync(path, data.replace('return foundModule.info;', 'return { originModule: foundModule, ...foundModule.info };'));
-}
-
-const DEADCODE = env.DEAD_CODE === 'true';
-
-if (DEADCODE) writeRollupSourceCode();
-
 function deadcodePlugins(customOptions = {}) {
 
-  if (!DEADCODE) return {}
+  if (env.DEAD_CODE !== 'true') return {}
 
   const options = {
     inputDir: 'src',
@@ -57887,6 +58054,7 @@ function deadcodePlugins(customOptions = {}) {
   };
 
   const fileMap = {};
+  const fileObj = {};
 
   return {
     name: 'vite-deadcode-plugin',
@@ -57894,10 +58062,20 @@ function deadcodePlugins(customOptions = {}) {
       await createFileMap(fileMap, options.inputDir);
     },
     async moduleParsed(module) {
-      if (fileMap.hasOwnProperty(module.id)) fileMap[module.id] = new Set();
+      if (fileMap.hasOwnProperty(module.id)) fileMap[module.id] = new Set(); 
     },
     async buildEnd() {
-      buildFileMap(fileMap, this);
+      let temp = null;
+      for (const key in fileMap) {
+        if (fileMap[key]) {
+          temp = await generateFileObj(key, this, fileMap);
+          if (temp) fileObj[key] = temp;
+        }
+      }
+
+      await flushFileQueue(this, fileObj, fileMap);
+
+      buildFileMap(fileMap, fileObj);
       writeFileMap(fileMap, options.outDir);
       if (options.breakBuild) exit(0);
     }

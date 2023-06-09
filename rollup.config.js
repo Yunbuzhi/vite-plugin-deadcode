@@ -14,5 +14,9 @@ export default {
       format: "es"
     }
   ],
-  plugins: [resolve({extensions: ['.js', '.cjs', '.mjs']}), json(), commonjs()]
+  plugins: [
+    resolve(),
+    json(),
+    commonjs()
+  ]
 };

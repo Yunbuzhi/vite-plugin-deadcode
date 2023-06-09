@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-deadcode",
-  "version": "1.0.15",
+  "version": "1.0.18",
   "homepage": "https://github.com/Tyrion1024/vite-plugin-deadcode.git",
   "scripts": {
     "build": "rollup -c"
@@ -12,9 +12,9 @@
     "rollup": "^3.23.0"
   },
   "dependencies": {
-    "@vue/compiler-dom": "^3.3.4",
     "@babel/parser": "^7.22.4",
-    "@babel/traverse": "^7.22.4"
+    "@babel/traverse": "^7.22.4",
+    "@vue/compiler-dom": "^3.3.4"
   },
   "repository": {
     "type": "git",

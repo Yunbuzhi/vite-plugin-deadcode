@@ -2,8 +2,7 @@ import { cwd } from 'node:process'
 import {
   existsSync,
   mkdirSync,
-  writeFileSync,
-  readFileSync
+  writeFileSync
 } from 'node:fs'
 
 export function writeFileMap(fileMap, outDir) {
@@ -42,16 +41,4 @@ export function autoMkdir(base, path) {
     baseUrl += '/' + arr[i]
     if (!existsSync(baseUrl)) mkdirSync(baseUrl)
   }
-}
-
-
-export function writeRollupSourceCode() {
-
-  const path = `${cwd()}/node_modules/rollup/dist/shared/rollup.js`
-
-  if (!existsSync(path)) throw new Error(`File "${path}" is not found`)
-
-  const data = readFileSync(path, 'utf8');
-
-  writeFileSync(path, data.replace('return foundModule.info;', 'return { originModule: foundModule, ...foundModule.info };'))
 }
