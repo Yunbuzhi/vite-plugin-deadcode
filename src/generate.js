@@ -101,13 +101,19 @@ async function findUnusedCode(originalCode, templateVars = new Set()) {
         if (!hasFile(id)) return
         if (!checkFile(id) && !fileQueue.includes(id)) fileQueue.push(id)
         if (id.endsWith('.vue')) return
+        if (typeof importMaps[id] === 'string') return
         if (!importMaps[id]) importMaps[id] = []
-        importMaps[id].push(...path.node.specifiers.map(v => {
-          return {
-            importName: v?.imported?.name || 'default',
-            localName: v.local.name
-          }
-        }))
+        const t = path.node.specifiers.find(v => v.type === 'ImportNamespaceSpecifier')
+        if (t) {
+          importMaps[id] = t.local.name
+        } else {
+          importMaps[id].push(...path.node.specifiers.map(v => {
+            return {
+              importName: v?.imported?.name || 'default',
+              localName: v.local.name
+            }
+          }))
+        }
       }))
       
     },
@@ -117,6 +123,7 @@ async function findUnusedCode(originalCode, templateVars = new Set()) {
           if (!hasFile(id)) return
           if (!checkFile(id) && !fileQueue.includes(id)) fileQueue.push(id)
           if (id.endsWith('.vue')) return
+          if (typeof importMaps[id] === 'string') return
           if (!importMaps[id]) importMaps[id] = []
           importMaps[id].push({
             importName: 'default',
@@ -131,6 +138,7 @@ async function findUnusedCode(originalCode, templateVars = new Set()) {
           if (!hasFile(id)) return
           if (!checkFile(id) && !fileQueue.includes(id)) fileQueue.push(id)
           if (id.endsWith('.vue')) return
+          if (typeof importMaps[id] === 'string') return
           if (!importMaps[id]) importMaps[id] = []
           importMaps[id].push({
             importName: 'default',
@@ -144,7 +152,11 @@ async function findUnusedCode(originalCode, templateVars = new Set()) {
   await Promise.all(asyncQueue)
 
   Object.keys(importMaps).forEach(key => {
-    importMaps[key] = importMaps[key].filter(v => !unusedCodeMap[v.localName])
+    if (typeof importMaps[key] === 'string') {
+      if (unusedCodeMap[importMaps[key]]) importMaps[key] = ''
+    } else {
+      importMaps[key] = importMaps[key].filter(v => !unusedCodeMap[v.localName])
+    }
     if (!importMaps[key].length) delete importMaps[key]
   })
 
@@ -306,6 +318,7 @@ async function findUnusedCodeInVueObject(originalCode, templateVars = new Set())
           if (!hasFile(id)) return
           if (!checkFile(id) && !fileQueue.includes(id)) fileQueue.push(id)
           if (id.endsWith('.vue')) return
+          if (typeof importMaps[id] === 'string') return
           if (!importMaps[id]) importMaps[id] = []
           importMaps[id].push({
             importName: 'default',
@@ -320,6 +333,7 @@ async function findUnusedCodeInVueObject(originalCode, templateVars = new Set())
           if (!hasFile(id)) return
           if (!checkFile(id) && !fileQueue.includes(id)) fileQueue.push(id)
           if (id.endsWith('.vue')) return
+          if (typeof importMaps[id] === 'string') return
           if (!importMaps[id]) importMaps[id] = []
           importMaps[id].push({
             importName: 'default',
@@ -333,13 +347,19 @@ async function findUnusedCodeInVueObject(originalCode, templateVars = new Set())
         if (!hasFile(id)) return
         if (!checkFile(id) && !fileQueue.includes(id)) fileQueue.push(id)
         if (id.endsWith('.vue')) return
+        if (typeof importMaps[id] === 'string') return
         if (!importMaps[id]) importMaps[id] = []
-        importMaps[id].push(...path.node.specifiers.map(v => {
-          return {
-            importName: v?.imported?.name || 'default',
-            localName: v.local.name
-          }
-        }))
+        const t = path.node.specifiers.find(v => v.type === 'ImportNamespaceSpecifier')
+        if (t) {
+          importMaps[id] = t.local.name
+        } else {
+          importMaps[id].push(...path.node.specifiers.map(v => {
+            return {
+              importName: v?.imported?.name || 'default',
+              localName: v.local.name
+            }
+          }))
+        }
       }))
     }
   })
