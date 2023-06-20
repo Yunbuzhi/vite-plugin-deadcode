@@ -1,6 +1,6 @@
 # vite-plugin-deadcode
 
-searching deadcode of vue-project for vite.
+searching deadcode for vue-project.
 
 ## Install
 
@@ -35,4 +35,4 @@ export default defineConfig({
 }
 ```
 
-At last "npm run vite:deadcode", and waiting for the process complete.
+"npm run vite:deadcode".
