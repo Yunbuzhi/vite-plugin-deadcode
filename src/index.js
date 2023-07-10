@@ -11,7 +11,6 @@ function deadcodePlugins(customOptions = {}) {
   const options = {
     inputDir: 'src',
     outDir: 'dist',
-    breakBuild: true,
     ...customOptions
   }
 
@@ -20,26 +19,55 @@ function deadcodePlugins(customOptions = {}) {
 
   return {
     name: 'vite-deadcode-plugin',
+    options() {
+      return {
+        treeshake: false,
+        watch: false
+      }
+    },
     async buildStart() {
-      await createFileMap(fileMap, options.inputDir)
+      try {
+        await createFileMap(fileMap, options.inputDir)
+      } catch(err) {
+        console.log(`err: createFileMap error \n ${err}`)
+      }
     },
     async moduleParsed(module) {
       if (fileMap.hasOwnProperty(module.id)) fileMap[module.id] = new Set() 
     },
     async buildEnd() {
-      let temp = null
-      for (const key in fileMap) {
-        if (fileMap[key]) {
-          temp = await generateFileObj(key, this, fileMap)
-          if (temp) fileObj[key] = temp
+      try {
+        let temp = null
+        for (const key in fileMap) {
+          if (fileMap[key]) {
+            temp = await generateFileObj(key, this, fileMap)
+            if (temp) fileObj[key] = temp
+          }
         }
+      } catch(err) {
+        console.log(`err: generateFileObj error \n ${err}`)
       }
 
-      await flushFileQueue(this, fileObj, fileMap)
+      try {
+        await flushFileQueue(this, fileObj, fileMap)
+      } catch(err) {
+        console.log(`err: flushFileQueue error \n ${err}`)
+      }
 
-      buildFileMap(fileMap, fileObj)
-      writeFileMap(fileMap, options.outDir)
-      if (options.breakBuild) exit(0)
+
+      try {
+        buildFileMap(fileMap, fileObj)
+      } catch(err) {
+        console.log(`err: buildFileMap error \n ${err}`)
+      }
+
+      try {
+        writeFileMap(fileMap, options.outDir)
+      } catch(err) {
+        console.log(`err: writeFileMap error \n ${err}`)
+      }
+
+      exit(0)
     }
   }
 }
