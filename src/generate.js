@@ -16,6 +16,7 @@ export async function flushFileQueue (context, fileObj, fileMap) {
   let temp = null
   while (fileQueue.length) {
     id = fileQueue.pop()
+    if (fileMap[id]) continue
     fileMap[id] = new Set()
     temp = await generateFileObj(id, context, fileMap)
     if (temp) fileObj[id] = temp
