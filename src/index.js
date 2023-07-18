@@ -19,8 +19,9 @@ function deadcodePlugins(customOptions = {}) {
 
   return {
     name: 'vite-deadcode-plugin',
-    options() {
+    options(option) {
       return {
+        ...option,
         treeshake: false,
         watch: false
       }

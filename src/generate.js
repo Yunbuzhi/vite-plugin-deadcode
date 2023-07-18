@@ -82,10 +82,30 @@ async function findUnusedCode(originalCode, templateVars = new Set()) {
       if (templateVars.size) return
       if (path.node.declaration?.type === "VariableDeclaration") {
         path.node.declaration.declarations.forEach((declaration) => {
-          exportNames.add(declaration.id.name);
+          if (declaration?.id?.name) {
+            exportNames.add(declaration.id.name);
+          } else if (declaration?.id?.properties?.length) {
+            declaration.id.properties.forEach(p => {
+              exportNames.add(p?.key?.name)
+            })
+          }
         });
       } else if (path.node.declaration?.type === "FunctionDeclaration") {
         exportNames.add(path.node.declaration.id.name);
+      } else if (path.node.source) {
+        asyncQueue.push(resolveDep(path.node.source.value).then(({id}) => {
+          if (!hasFile(id)) return
+          if (!checkFile(id) && !fileQueue.includes(id)) fileQueue.push(id)
+          if (id.endsWith('.vue')) return
+          if (typeof importMaps[id] === 'string') return
+          if (!importMaps[id]) importMaps[id] = []
+          importMaps[id].push(...path.node.specifiers.map(v => {
+            return {
+              importName: v?.local?.name || 'default',
+              localName: v.exported.name
+            }
+          }))
+        }))
       }
     },
     ExportSpecifier(path) {
