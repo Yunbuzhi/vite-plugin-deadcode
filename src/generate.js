@@ -117,6 +117,18 @@ async function findUnusedCode(originalCode, templateVars = new Set()) {
       exportNames.add('default')
     },
 
+    ExportAllDeclaration(path) {
+      if (path?.node?.source?.value) {
+        asyncQueue.push(resolveDep(path?.node?.source?.value).then(({id}) => {
+          if (!hasFile(id)) return
+          if (!checkFile(id) && !fileQueue.includes(id)) fileQueue.push(id)
+          if (id.endsWith('.vue')) return
+          if (typeof importMaps[id] === 'string') return
+          if (!importMaps[id]) importMaps[id] = 'default'
+        }))
+      }
+    },
+
     ImportDeclaration: function(path) {
       asyncQueue.push(resolveDep(path.node.source.value).then(({id}) => {
         if (!hasFile(id)) return
@@ -126,12 +138,12 @@ async function findUnusedCode(originalCode, templateVars = new Set()) {
         if (!importMaps[id]) importMaps[id] = []
         const t = path.node.specifiers.find(v => v.type === 'ImportNamespaceSpecifier')
         if (t) {
-          importMaps[id] = t.local.name
+          importMaps[id] = t?.local?.name || 'default'
         } else {
           importMaps[id].push(...path.node.specifiers.map(v => {
             return {
               importName: v?.imported?.name || 'default',
-              localName: v.local.name
+              localName: v.local.name || 'default'
             }
           }))
         }
