@@ -34,7 +34,7 @@ function deadcodePlugins(customOptions = {}) {
       }
     },
     async moduleParsed(module) {
-      if (fileMap.hasOwnProperty(module.id)) fileMap[module.id] = new Set() 
+      if (fileMap.hasOwnProperty(module.id)) fileMap[module.id] = {}
     },
     async buildEnd() {
       try {

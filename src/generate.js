@@ -74,7 +74,10 @@ async function findUnusedCode(originalCode, templateVars = new Set()) {
     Program: function (path) {
       const binding = path.scope.getAllBindings()
       for (let key in binding) {
-        if (!binding[key].referenced && !templateVars.has(key)) unusedCodeMap[key] = `${binding[key].kind} - ${originalCode.substring(binding[key].identifier.start, binding[key].identifier.end)}`;
+        if (!binding[key].referenced && !templateVars.has(key)) unusedCodeMap[key] = {
+          type: binding[key].kind,
+          text: originalCode.substring(binding[key].identifier.start, binding[key].identifier.end)
+        };
       }
     },
   
@@ -279,14 +282,20 @@ async function findUnusedCodeInVueObject(originalCode, templateVars = new Set())
   const vueVars = {};
 
   const addValue = (key, node, val, parent) => {
-		if (!templateVars.has(val))	vueVars[val] = `${key} - ${originalCode.substring(parent?.start || node.start, parent?.end || node.end)}`
+		if (!templateVars.has(val))	vueVars[val] = {
+      type: key,
+      text: originalCode.substring(parent?.start || node.start, parent?.end || node.end)
+    }
 	}
 
   traverse(astree, {
     Program: function (path) {
       const binding = path.scope.getAllBindings()
       for (let key in binding) {
-        if (!binding[key].referenced) unusedVars[key] = `${binding[key].kind} - ${originalCode.substring(binding[key].identifier.start, binding[key].identifier.end)}`;
+        if (!binding[key].referenced) unusedVars[key] = {
+          type: binding[key].kind,
+          text: originalCode.substring(binding[key].identifier.start, binding[key].identifier.end)
+        };
       }
     },
     ObjectExpression: function (path) {

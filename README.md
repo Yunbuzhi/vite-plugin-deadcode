@@ -38,8 +38,4 @@ export default defineConfig({
 ```
 Then `$npm run vite:deadcode`, When the process finish,
 
-you'll see file `${outDir}/file.txt`,
-<image src="https://raw.githubusercontent.com/Tyrion1024/vite-plugin-deadcode/dev/static/file_txt.jpg" style="margin: 10px"/>
-
-And file `${outDir}/code.txt`.
-<image src="https://raw.githubusercontent.com/Tyrion1024/vite-plugin-deadcode/dev/static/code_txt.jpg" style="margin: 10px"/>
+you'll see file `${outDir}/deadcode.html`.
