@@ -1,13 +1,15 @@
 # vite-plugin-deadcode
 
-searching deadcode for vue-project.
+Searching deadcode for vue-project.
+
+First of all, your project must support command `$vite build`
 
 ## Install
 
 ```bash
-npm install vite-plugin-deadcode --save-dev
+$npm install vite-plugin-deadcode --save-dev
 # or
-yarn add vite-plugin-deadcode -D
+$yarn add vite-plugin-deadcode -D
 ```
 
 ## Usage
@@ -19,8 +21,8 @@ import deadcodePlugins from 'vite-plugin-deadcode'
 
 export default defineConfig({
   plugins: [deadcodePlugins({
-    inputDir: 'src',  // 检查目录，默认为src
-    outDir: 'dist'  // deadcode输出目录，默认为dist
+    inputDir: 'src',  // serarch path, default: src
+    outDir: 'dist'  // the path where deadcode output, default: dist
   })]
 })
 ```
@@ -34,5 +36,6 @@ export default defineConfig({
   }
 }
 ```
+Then `$npm run vite:deadcode`, When the process finish,
 
-"npm run vite:deadcode".
+you'll see file `${outDir}/deadcode.html`.

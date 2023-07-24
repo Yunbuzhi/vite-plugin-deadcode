@@ -74,7 +74,10 @@ async function findUnusedCode(originalCode, templateVars = new Set()) {
     Program: function (path) {
       const binding = path.scope.getAllBindings()
       for (let key in binding) {
-        if (!binding[key].referenced && !templateVars.has(key)) unusedCodeMap[key] = `${binding[key].kind} - ${originalCode.substring(binding[key].identifier.start, binding[key].identifier.end)}`;
+        if (!binding[key].referenced && !templateVars.has(key)) unusedCodeMap[key] = {
+          type: binding[key].kind,
+          text: originalCode.substring(binding[key].identifier.start, binding[key].identifier.end)
+        };
       }
     },
   
@@ -82,10 +85,30 @@ async function findUnusedCode(originalCode, templateVars = new Set()) {
       if (templateVars.size) return
       if (path.node.declaration?.type === "VariableDeclaration") {
         path.node.declaration.declarations.forEach((declaration) => {
-          exportNames.add(declaration.id.name);
+          if (declaration?.id?.name) {
+            exportNames.add(declaration.id.name);
+          } else if (declaration?.id?.properties?.length) {
+            declaration.id.properties.forEach(p => {
+              exportNames.add(p?.key?.name)
+            })
+          }
         });
       } else if (path.node.declaration?.type === "FunctionDeclaration") {
         exportNames.add(path.node.declaration.id.name);
+      } else if (path.node.source) {
+        asyncQueue.push(resolveDep(path.node.source.value).then(({id}) => {
+          if (!hasFile(id)) return
+          if (!checkFile(id) && !fileQueue.includes(id)) fileQueue.push(id)
+          if (id.endsWith('.vue')) return
+          if (typeof importMaps[id] === 'string') return
+          if (!importMaps[id]) importMaps[id] = []
+          importMaps[id].push(...path.node.specifiers.map(v => {
+            return {
+              importName: v?.local?.name || 'default',
+              localName: v.exported.name
+            }
+          }))
+        }))
       }
     },
     ExportSpecifier(path) {
@@ -97,6 +120,18 @@ async function findUnusedCode(originalCode, templateVars = new Set()) {
       exportNames.add('default')
     },
 
+    ExportAllDeclaration(path) {
+      if (path?.node?.source?.value) {
+        asyncQueue.push(resolveDep(path?.node?.source?.value).then(({id}) => {
+          if (!hasFile(id)) return
+          if (!checkFile(id) && !fileQueue.includes(id)) fileQueue.push(id)
+          if (id.endsWith('.vue')) return
+          if (typeof importMaps[id] === 'string') return
+          if (!importMaps[id]) importMaps[id] = 'default'
+        }))
+      }
+    },
+
     ImportDeclaration: function(path) {
       asyncQueue.push(resolveDep(path.node.source.value).then(({id}) => {
         if (!hasFile(id)) return
@@ -106,12 +141,12 @@ async function findUnusedCode(originalCode, templateVars = new Set()) {
         if (!importMaps[id]) importMaps[id] = []
         const t = path.node.specifiers.find(v => v.type === 'ImportNamespaceSpecifier')
         if (t) {
-          importMaps[id] = t.local.name
+          importMaps[id] = t?.local?.name || 'default'
         } else {
           importMaps[id].push(...path.node.specifiers.map(v => {
             return {
               importName: v?.imported?.name || 'default',
-              localName: v.local.name
+              localName: v.local.name || 'default'
             }
           }))
         }
@@ -247,14 +282,20 @@ async function findUnusedCodeInVueObject(originalCode, templateVars = new Set())
   const vueVars = {};
 
   const addValue = (key, node, val, parent) => {
-		if (!templateVars.has(val))	vueVars[val] = `${key} - ${originalCode.substring(parent?.start || node.start, parent?.end || node.end)}`
+		if (!templateVars.has(val))	vueVars[val] = {
+      type: key,
+      text: originalCode.substring(parent?.start || node.start, parent?.end || node.end)
+    }
 	}
 
   traverse(astree, {
     Program: function (path) {
       const binding = path.scope.getAllBindings()
       for (let key in binding) {
-        if (!binding[key].referenced) unusedVars[key] = `${binding[key].kind} - ${originalCode.substring(binding[key].identifier.start, binding[key].identifier.end)}`;
+        if (!binding[key].referenced) unusedVars[key] = {
+          type: binding[key].kind,
+          text: originalCode.substring(binding[key].identifier.start, binding[key].identifier.end)
+        };
       }
     },
     ObjectExpression: function (path) {

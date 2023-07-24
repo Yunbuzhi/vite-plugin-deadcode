@@ -17,11 +17,14 @@ export function buildFileMap (fileMap, fileObj) {
 
   Object.keys(fileObj).forEach((id) => {
     for (let key in fileObj[id].unusedCodeMap) {
-      fileMap[id].add(fileObj[id].unusedCodeMap[key])
+      if (!fileMap[id][fileObj[id].unusedCodeMap[key].type]) fileMap[id][fileObj[id].unusedCodeMap[key].type] = []
+      fileMap[id][fileObj[id].unusedCodeMap[key].type].push(fileObj[id].unusedCodeMap[key].text)
     }
 
-    if (fileObj[id].exportNames.size) fileMap[id].add(`Useless to export ${Array.from(fileObj[id].exportNames).join('、')}.`)
+    if (fileObj[id].exportNames.size) {
+      fileMap[id].uselessExportNames = Array.from(fileObj[id].exportNames)
+    }
 
-    if (fileObj[id].errMessage) fileMap[id].add(fileObj[id].errMessage)
+    if (fileObj[id].errMessage) fileMap[id].errMessage = fileObj[id].errMessage
   })
 }

@@ -19,8 +19,9 @@ function deadcodePlugins(customOptions = {}) {
 
   return {
     name: 'vite-deadcode-plugin',
-    options() {
+    options(option) {
       return {
+        ...option,
         treeshake: false,
         watch: false
       }
@@ -33,7 +34,7 @@ function deadcodePlugins(customOptions = {}) {
       }
     },
     async moduleParsed(module) {
-      if (fileMap.hasOwnProperty(module.id)) fileMap[module.id] = new Set() 
+      if (fileMap.hasOwnProperty(module.id)) fileMap[module.id] = {}
     },
     async buildEnd() {
       try {
