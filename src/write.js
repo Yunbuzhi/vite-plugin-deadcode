@@ -71,6 +71,8 @@ const createHtmlTemplate = (content1, content2, content3) => `<!DOCTYPE html>
 </body>
 </html>`
 
+const formatUrl = (url) => url.replace(cwd(), '')
+
 export function writeFileMap(fileMap, outDir) {
   let content1 = '',
     content2 = '',
@@ -80,11 +82,11 @@ export function writeFileMap(fileMap, outDir) {
   for (const key in fileMap) {
     if (!fileMap[key]) {
       content1 += `
-      <p>${key}</p>`
+      <p>${formatUrl(key)}</p>`
     } else if (Object.keys(fileMap[key]).length) {
       content2 += `
       <p class="content2" ${!count? 'id="activeTab"' : ''} data-index="${count}">
-        ${key}
+        ${formatUrl(key)}
       </p>`
 
       let temp = ''
