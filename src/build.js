@@ -5,10 +5,10 @@ export function buildFileMap (fileMap, fileObj) {
     const importMaps = fileObj[id].importMaps
     for (const key in importMaps) {
       if (typeof importMaps[key] === 'string') {
-        fileObj[key].exportNames.clear()
+        fileObj[key]?.exportNames.clear()
       } else {
         importMaps[key].forEach(v => {
-          fileObj[key].exportNames.delete(v.importName)
+          fileObj[key]?.exportNames.delete(v.importName)
         })
       }
     }
